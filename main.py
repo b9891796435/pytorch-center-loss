@@ -5,7 +5,6 @@ import datetime
 import time
 import os.path as osp
 import matplotlib
-matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -18,10 +17,12 @@ import datasets
 import models
 from utils import AverageMeter, Logger
 from center_loss import CenterLoss
+matplotlib.use('Agg')
+
 
 parser = argparse.ArgumentParser("Center Loss Example")
 # dataset
-parser.add_argument('-d', '--dataset', type=str, default='mnist', choices=['mnist'])
+parser.add_argument('-d', '--dataset', type=str, default='ferplus', choices=['mnist'])
 parser.add_argument('-j', '--workers', default=4, type=int,
                     help="number of data loading workers (default: 4)")
 # optimization
@@ -33,7 +34,7 @@ parser.add_argument('--max-epoch', type=int, default=100)
 parser.add_argument('--stepsize', type=int, default=20)
 parser.add_argument('--gamma', type=float, default=0.5, help="learning rate decay")
 # model
-parser.add_argument('--model', type=str, default='cnn')
+parser.add_argument('--model', type=str, default='A_mobileNet')
 # misc
 parser.add_argument('--eval-freq', type=int, default=10)
 parser.add_argument('--print-freq', type=int, default=50)
@@ -176,7 +177,7 @@ def test(model, testloader, use_gpu, num_classes, epoch):
     if args.plot:
         all_features = np.concatenate(all_features, 0)
         all_labels = np.concatenate(all_labels, 0)
-        plot_features(all_features, all_labels, num_classes, epoch, prefix='test')
+        plot_features(all_features, all_labels, num_classes, epoch, prefix='test.py')
 
     acc = correct * 100. / total
     err = 100. - acc
