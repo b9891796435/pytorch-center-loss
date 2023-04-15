@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class CenterLoss(nn.Module):
     """Center loss.
     
@@ -11,6 +12,7 @@ class CenterLoss(nn.Module):
         num_classes (int): number of classes.
         feat_dim (int): feature dimension.
     """
+
     def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
         super(CenterLoss, self).__init__()
         self.num_classes = num_classes
@@ -20,7 +22,7 @@ class CenterLoss(nn.Module):
         if self.use_gpu:
             self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda())
         else:
-            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))  # 随机初始化中心
 
     def forward(self, x, labels):
         """
