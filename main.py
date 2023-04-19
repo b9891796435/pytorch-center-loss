@@ -71,8 +71,8 @@ def main():
     trainloader, testloader = dataset.trainloader, dataset.testloader
 
     print("Creating model: {}".format(args.model))
-    model = models.create(name=args.model, num_classes=dataset.num_classes)
-
+    # model = models.create(name=args.model, num_classes=dataset.num_classes)
+    model = torch.load('model.pth')
     if use_gpu:
         model = nn.DataParallel(model).cuda()
 
@@ -94,10 +94,10 @@ def main():
 
         if args.stepsize > 0: scheduler.step()
 
-        if args.eval_freq > 0 and (epoch + 1) % args.eval_freq == 0 or (epoch + 1) == args.max_epoch:
-            print("==> Test")
-            acc, err = test(model, testloader, use_gpu, dataset.num_classes, epoch)
-            print("Accuracy (%): {}\t Error rate (%): {}".format(acc, err))
+        # if args.eval_freq > 0 and (epoch + 1) % args.eval_freq == 0 or (epoch + 1) == args.max_epoch:
+        print("==> Test")
+        acc, err = test(model, testloader, use_gpu, dataset.num_classes, epoch)
+        print("Accuracy (%): {}\t Error rate (%): {}".format(acc, err))
 
     elapsed = round(time.time() - start_time)
     elapsed = str(datetime.timedelta(seconds=elapsed))
@@ -153,6 +153,7 @@ def train(model, criterion_xent, criterion_cent,
         all_features = np.concatenate(all_features, 0)
         all_labels = np.concatenate(all_labels, 0)
         plot_features(all_features, all_labels, num_classes, epoch, prefix='train')
+    torch.save(model,'model.pth')
 
 
 def test(model, testloader, use_gpu, num_classes, epoch):
@@ -168,7 +169,8 @@ def test(model, testloader, use_gpu, num_classes, epoch):
             features, outputs = model(data)
             predictions = outputs.data.max(1)[1]
             total += labels.size(0)
-            correct += (predictions == labels.data).sum()
+            correct += (predictions == labels.data.max(1)[1]).sum()
+            break
 
             if args.plot:
                 if use_gpu:
