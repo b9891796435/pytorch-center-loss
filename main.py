@@ -4,6 +4,8 @@ import argparse
 import datetime
 import time
 import os.path as osp
+from collections import OrderedDict
+
 import matplotlib
 from matplotlib import pyplot as plt
 import numpy as np
@@ -17,6 +19,7 @@ import datasets
 import models
 from utils import AverageMeter, Logger
 from center_loss import CenterLoss
+from models import A_mobileNet
 
 matplotlib.use('Agg')
 
@@ -72,7 +75,18 @@ def main():
 
     print("Creating model: {}".format(args.model))
     # model = models.create(name=args.model, num_classes=dataset.num_classes)
-    model = torch.load('model.pth')
+    # model = torch.load('model.pth')
+
+    emotion_dict = torch.load("model.pth", map_location=torch.device('cpu')).eval().state_dict()
+    model = emotion_dict.items()
+    temp_arr=[]
+    for i in model:
+        temp_item = list(i)
+        temp_item[0]=temp_item[0][14:]
+        temp_arr.append(temp_item)
+    model = A_mobileNet(8)
+    emotion_dict=OrderedDict(temp_arr)
+    model.load_state_dict(emotion_dict)
     if use_gpu:
         model = nn.DataParallel(model).cuda()
 
@@ -87,12 +101,12 @@ def main():
     start_time = time.time()
 
     for epoch in range(args.max_epoch):
-        print("==> Epoch {}/{}".format(epoch + 1, args.max_epoch))
-        train(model, criterion_xent, criterion_cent,
-              optimizer_model, optimizer_centloss,
-              trainloader, use_gpu, dataset.num_classes, epoch)
-
-        if args.stepsize > 0: scheduler.step()
+        # print("==> Epoch {}/{}".format(epoch + 1, args.max_epoch))
+        # train(model, criterion_xent, criterion_cent,
+        #       optimizer_model, optimizer_centloss,
+        #       trainloader, use_gpu, dataset.num_classes, epoch)
+        #
+        # if args.stepsize > 0: scheduler.step()
 
         # if args.eval_freq > 0 and (epoch + 1) % args.eval_freq == 0 or (epoch + 1) == args.max_epoch:
         print("==> Test")
@@ -153,7 +167,7 @@ def train(model, criterion_xent, criterion_cent,
         all_features = np.concatenate(all_features, 0)
         all_labels = np.concatenate(all_labels, 0)
         plot_features(all_features, all_labels, num_classes, epoch, prefix='train')
-    torch.save(model,'model.pth')
+    # torch.save(model,'model.pth')
 
 
 def test(model, testloader, use_gpu, num_classes, epoch):
