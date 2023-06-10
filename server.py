@@ -28,13 +28,14 @@ EMOTIONS = ["neutral", "happiness", "surprise", "sadness", "anger", "disgust",
 logger = logging.getLogger("pc")
 pcs = set()
 relay = MediaRelay()
-
+# 数据库连接
 connection = pymysql.connect(host='localhost',
                              user='root',
                              password='',
                              database='project',
                              charset='utf8mb4',
                              cursorclass=pymysql.cursors.DictCursor)
+# jwt密钥及函数
 jwt_secret = 'twilight-sparkle'
 
 
@@ -46,10 +47,10 @@ def decodeJwt(Str):
     return jwt.decode(Str, jwt_secret, ['HS256'])
 
 
-async def login(request):
+async def login(request):  # 登录
     params = await request.json()
     with connection.cursor() as cursor:
-        # Read a single record
+
         try:
             sql = 'select * from user where uname="%s" and password="%s"' % (
                 params['username'], params['password'])
@@ -68,14 +69,14 @@ async def login(request):
             return web.Response(
                 content_type="application/json",
                 text=json.dumps(
-                    {'status': 'fail'}
+                    {'status': 'fail', 'msg': '用户名或密码错误'}
                 ), )
 
 
-async def register(request):
+async def register(request):  # 注册
     params = await request.json()
     with connection.cursor() as cursor:
-        # Read a single record
+
         try:
             sql = 'select * from user where uname="%s"' % (params['username'])
             cursor.execute(sql)
@@ -95,9 +96,11 @@ async def register(request):
                             {'userid': params['USERID'], 'permission': 0}),
                          'permission': 0}
                     ), )
+            else:
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps({'status': 'fail', 'msg': '用户名已使用'}))
 
-        # connection is not autocommit by default. So you must commit to save
-        # your changes.
         except Exception:
             print(Exception)
             return web.Response(
@@ -107,12 +110,11 @@ async def register(request):
                 ), )
 
 
-async def profile(request):
+async def profile(request):  # 个人信息
     params = await request.json()
     try:
         user = decodeJwt(request.headers['auth'])
         with connection.cursor() as cursor:
-            # Read a single record
             try:
                 sql = 'select * from user where userid=%d' % user['userid']
                 cursor.execute(sql)
@@ -142,18 +144,18 @@ async def profile(request):
                 {'status': 'fail'}
             ), )
 
-async def queryQueryRecord(request):
+
+async def queryQueryRecord(request):  # 查询“查询记录”
     params = await request.json()
     try:
         user = decodeJwt(request.headers['auth'])
         with connection.cursor() as cursor:
-            # Read a single record
             try:
                 sql = 'select * from query_record where userid=%d limit 10 offset %d' \
-                      % (params['userid'],params['page']*10)
+                      % (params['userid'], params['page']*10)
                 cursor.execute(sql)
                 result = cursor.fetchall()
-                sql = 'select count(*) from query_record where userid=%d'%params['userid']
+                sql = 'select count(*) from query_record where userid=%d' % params['userid']
                 cursor.execute(sql)
                 count = cursor.fetchone()['count(*)']
                 if result is None:
@@ -164,7 +166,7 @@ async def queryQueryRecord(request):
                         'status': 'success',
                         'data': {
                             'record': result,
-                            'count':count
+                            'count': count
                         }
                     }))
             except Exception:
@@ -182,14 +184,14 @@ async def queryQueryRecord(request):
                 {'status': 'fail'}
             ), )
 
-async def superProfile(request):
+
+async def superProfile(request):  # 超管查询用户信息
     params = await request.json()
     try:
         user = decodeJwt(request.headers['auth'])
-        if user['permission']!=2:
+        if user['permission'] != 2:
             raise Exception()
         with connection.cursor() as cursor:
-            # Read a single record
             sql = 'select *,CAST(sum(COUNT) as UNSIGNED) as DONATION,u.USERID as USERID from user u ' \
                   'left join donate_tbl dt on u.USERID = dt.USERID ' \
                   'GROUP BY u.USERID limit 10 offset %d' % (params['page']*10)
@@ -205,7 +207,7 @@ async def superProfile(request):
                 text=json.dumps({
                     'status': 'success',
                     'data': {
-                        'count':count,
+                        'count': count,
                         'profile': result,
                     }
                 }))
@@ -217,102 +219,19 @@ async def superProfile(request):
                 {'status': 'fail'}
             ), )
 
-async def profileRecord(request):
-    params = await request.json()
+
+async def cancelAccount(request):  # 注销账号
+    params = None
     try:
-        user = decodeJwt(request.headers['auth'])
-        with connection.cursor() as cursor:
-            # Read a single record
-            try:
-                sql = 'select * from USE_RECORD where userid=%d ' \
-                      'order by USE_TIME desc limit 10 offset %d' \
-                      % (user['userid'],params['page']*10)
-                cursor.execute(sql)
-                result = cursor.fetchall()
-                sql = 'select count(*) from USE_RECORD where userid=%d' \
-                      % user['userid']
-                cursor.execute(sql)
-                result2 = cursor.fetchone()['count(*)']
-                return web.Response(
-                    content_type="application/json",
-                    text=json.dumps({
-                        'status': 'success',
-                        'data': {
-                            'record': result,
-                            'count':result2
-                        }
-                    }))
-            except Exception:
-                print(Exception)
-                return web.Response(
-                    content_type="application/json",
-                    text=json.dumps(
-                        {'status': 'fail'}
-                    ), )
+        params = await request.json()
     except Exception:
-        print(Exception)
-        return web.Response(
-            content_type="application/json",
-            text=json.dumps(
-                {'status': 'fail'}
-            ), )
-
-
-async def queryRecord(request):
-    params = await request.json()
-    try:
-        user = decodeJwt(request.headers['auth'])
-        if (user['permission'] < 1):
-            raise Exception()
-        with connection.cursor() as cursor:
-            # Read a single record
-            try:
-                sql = 'select * from use_record where USERID = %d ' \
-                      'order by USE_TIME desc limit 10 offset %d' % (
-                     params['userId'],params['page'] * 10)
-                cursor.execute(sql)
-                result = cursor.fetchall()
-                sql = 'select count(*) from use_record where USERID = %d' % params['userId']
-                cursor.execute(sql)
-                count = cursor.fetchone()
-                sql = 'insert into query_record (USERID, QUERYID, QUERYTIME) ' \
-                      'values (%d,%d,%d)' % (
-                          user['userid'],params['userId'], round(time.time())
-                      )
-                cursor.execute(sql)
-                connection.commit()
-                return web.Response(
-                    content_type="application/json",
-                    text=json.dumps({"count": count['count(*)'], "data": result}))
-            except Exception:
-                print(Exception)
-                return web.Response(
-                    content_type="application/json",
-                    text=json.dumps(
-                        {'status': 'fail'}
-                    ), )
-    except Exception:
-        print(Exception)
-        return web.Response(
-            content_type="application/json",
-            text=json.dumps(
-                {'status': 'fail'}
-            ), )
-
-
-async def editProfile(request):
-    params = await request.json()
+        pass
     try:
         user = decodeJwt(request.headers['auth'])
         with connection.cursor() as cursor:
-            # Read a single record
             try:
-                uid=params['userid'] if 'userid' in params and user['permission']==2 else user['userid']
-                sql = 'update user set NAME="%s",AGE=%d,SEX="%s",' \
-                      'UNAME="%s",PASSWORD="%s" where USERID=%d' \
-                      % (params['NAME'], params['AGE'], params['SEX'],
-                         params['UNAME'], params['PASSWORD'],
-                         uid,)
+                uid = params['userid'] if params is not None and 'userid' in params and user['permission'] == 2 else user['userid']
+                sql = 'delete from user where USERID=%d' % (uid)
                 cursor.execute(sql)
             except Exception:
                 print(Exception)
@@ -336,184 +255,66 @@ async def editProfile(request):
             ), )
 
 
-async def pubDynamic(request):
-    params = await request.json()
-    with connection.cursor() as cursor:
-        # Read a single record
-        try:
-            user = decodeJwt(request.headers["auth"])
-            sql = 'insert into dynamic ' \
-                  '(PUBLISH_TIME,DY_CONTENT,RECORD_ID,USERID) ' \
-                  'values (%d,"%s",%d,%d)' % (
-                      round(time.time()), params['content'],
-                      params['recordId'], user['userid']
-                  )
-            cursor.execute(sql)
-            connection.commit()
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'success'}
-                ), )
-        # connection is not autocommit by default. So you must commit to save
-        # your changes.
-        except Exception:
-            print(Exception)
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'fail'}
-                ), )
-
-async def donation(request):
-    params = await request.json()
-    with connection.cursor() as cursor:
-        # Read a single record
-        try:
-            user = decodeJwt(request.headers["auth"])
-            sql = 'insert into donate_tbl (COUNT, USERID) VALUES (%d,%d)' \
-                  % (params['count'],user['userid'])
-            cursor.execute(sql)
-            connection.commit()
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'success'}
-                ), )
-        # connection is not autocommit by default. So you must commit to save
-        # your changes.
-        except Exception:
-            print(Exception)
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'fail'}
-                ), )
-
-async def pubComment(request):
-    params = await request.json()
-    with connection.cursor() as cursor:
-        # Read a single record
-        try:
-            user = decodeJwt(request.headers["auth"])
-            sql = 'insert into comment ' \
-                  '(PUBLISH_TIME,COMMENT_CONTENT,FORWARD_ID,USERID) ' \
-                  'values (%d,"%s",%d,%d)' % (
-                      round(time.time()), params['content'],
-                      params['dynamicID'], user['userid']
-                  )
-            cursor.execute(sql)
-            connection.commit()
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'success'}
-                ), )
-        # connection is not autocommit by default. So you must commit to save
-        # your changes.
-        except Exception:
-            print(Exception)
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'fail'}
-                ), )
-
-
-async def likeComment(request):
-    params = await request.json()
-    with connection.cursor() as cursor:
-        # Read a single record
-        try:
-            user = decodeJwt(request.headers["auth"])
-            sql = 'select * from comment_like_tbl where COMMENT_ID=%d and USERID=%d'\
-                  % (params['commentID'],user['userid'])
-            cursor.execute(sql)
-            result = cursor.fetchone()
-            if result is None:
-                user = decodeJwt(request.headers["auth"])
-                sql = 'insert into comment_like_tbl (COMMENT_ID, USERID) VALUES (%d,%d)' \
-                      % (params['commentID'],user['userid'])
+async def deleteDynamic(request):  # 删除动态
+    params = None
+    try:
+        params = await request.json()
+    except Exception:
+        pass
+    try:
+        user = decodeJwt(request.headers['auth'])
+        if user['permission'] < 1:
+            raise Exception()
+        with connection.cursor() as cursor:
+            try:
+                sql = 'delete from dynamic where DYNAMIC_ID=%d' % params['dynamicID']
                 cursor.execute(sql)
-                connection.commit()
-                sql = 'update comment set LIKE_COUNT = LIKE_COUNT+1 where COMMENT_ID=%d' \
-                      % (params['commentID'])
-                cursor.execute(sql)
-                connection.commit()
+            except Exception:
+                print(Exception)
                 return web.Response(
                     content_type="application/json",
                     text=json.dumps(
-                        {'status': 'success'}
+                        {'status': 'fail'}
                     ), )
-            else:
-                raise Exception()
-        # connection is not autocommit by default. So you must commit to save
-        # your changes.
-        except Exception:
-            print(Exception)
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'fail'}
-                ), )
+        connection.commit()
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {'status': 'success'}
+            ), )
+    except Exception:
+        print(Exception)
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {'status': 'fail'}
+            ), )
 
 
-async def likeDynamic(request):
+async def profileRecord(request):  # 个人信息页查询使用记录，分页
     params = await request.json()
-    with connection.cursor() as cursor:
-        # Read a single record
-        try:
-            user = decodeJwt(request.headers["auth"])
-            sql = 'select * from like_tbl where DYNAMIC_ID=%d and USERID=%d'\
-                  % (params['dynamicID'],user['userid'])
-            cursor.execute(sql)
-            result = cursor.fetchone()
-            if result is None:
-                user = decodeJwt(request.headers["auth"])
-                sql = 'insert into like_tbl (DYNAMIC_ID, USERID) VALUES (%d,%d)' \
-                      % (params['dynamicID'],user['userid'])
-                cursor.execute(sql)
-                connection.commit()
-                sql = 'update dynamic set LIKE_COUNT = LIKE_COUNT+1 where DYNAMIC_ID=%d' \
-                      % (params['dynamicID'])
-                cursor.execute(sql)
-                connection.commit()
-                return web.Response(
-                    content_type="application/json",
-                    text=json.dumps(
-                        {'status': 'success'}
-                    ), )
-            else:
-                raise Exception("temp")
-        # connection is not autocommit by default. So you must commit to save
-        # your changes.
-        except Exception:
-            print(Exception)
-            return web.Response(
-                content_type="application/json",
-                text=json.dumps(
-                    {'status': 'fail'}
-                ), )
-
-
-async def dynamicList(request):
     try:
         user = decodeJwt(request.headers['auth'])
         with connection.cursor() as cursor:
-            # Read a single record
             try:
-                sql = 'SELECT DYNAMIC_ID,NAME,PUBLISH_TIME,DY_CONTENT,LIKE_COUNT,PIC_PATH FROM dynamic dy ' \
-                      'inner join user u on dy.USERID = u.USERID ' \
-                      'inner join use_record ur on dy.RECORD_ID = ur.RECORD_ID ' \
-                      'limit 10 offset %d' % (int(request.query['page'])*10)
+                sql = 'select * from USE_RECORD where userid=%d ' \
+                      'order by USE_TIME desc limit 10 offset %d' \
+                      % (user['userid'], params['page']*10)
                 cursor.execute(sql)
                 result = cursor.fetchall()
-                sql = 'SELECT count(*) FROM dynamic'
+                sql = 'select count(*) from USE_RECORD where userid=%d' \
+                      % user['userid']
                 cursor.execute(sql)
-                count = cursor.fetchone()['count(*)']
+                result2 = cursor.fetchone()['count(*)']
                 return web.Response(
                     content_type="application/json",
-                    text=json.dumps({"status": "success", "data": result,"count":count}))
+                    text=json.dumps({
+                        'status': 'success',
+                        'data': {
+                            'record': result,
+                            'count': result2
+                        }
+                    }))
             except Exception:
                 print(Exception)
                 return web.Response(
@@ -529,17 +330,280 @@ async def dynamicList(request):
                 {'status': 'fail'}
             ), )
 
-async def dynamicDetail(request):
-    params=await request.json()
+
+async def queryRecord(request):  # 管理员查询使用记录，分页
+    params = await request.json()
+    try:
+        user = decodeJwt(request.headers['auth'])
+        if (user['permission'] < 1):
+            raise Exception()
+        with connection.cursor() as cursor:
+            try:
+                sql = 'select * from use_record where USERID = %d ' \
+                      'order by USE_TIME desc limit 10 offset %d' % (
+                          params['userId'], params['page'] * 10)
+                cursor.execute(sql)
+                result = cursor.fetchall()
+                sql = 'select count(*) from use_record where USERID = %d' % params['userId']
+                cursor.execute(sql)
+                count = cursor.fetchone()
+                sql = 'insert into query_record (USERID, QUERYID, QUERYTIME) ' \
+                      'values (%d,%d,%d)' % (
+                          user['userid'], params['userId'], round(time.time())
+                      )
+                cursor.execute(sql)
+                connection.commit()
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps({"count": count['count(*)'], "data": result}))
+            except Exception:
+                print(Exception)
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps(
+                        {'status': 'fail'}
+                    ), )
+    except Exception:
+        print(Exception)
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {'status': 'fail'}
+            ), )
+
+
+async def editProfile(request):  # 更改个人信息及提权
+    params = await request.json()
     try:
         user = decodeJwt(request.headers['auth'])
         with connection.cursor() as cursor:
-            # Read a single record
+            try:
+                uid = params['userid'] if 'userid' in params and user['permission'] == 2 else user['userid']
+                aut = ',AUT_NUM=%d' % params['autNum'] if 'autNum' in params and user['permission'] == 2 else ''
+                sql = 'update user set NAME="%s",AGE=%d,SEX="%s",' \
+                      'UNAME="%s",PASSWORD="%s"%s where USERID=%d' \
+                      % (params['NAME'], params['AGE'], params['SEX'],
+                         params['UNAME'], params['PASSWORD'],
+                         aut, uid)
+                cursor.execute(sql)
+            except Exception:
+                print(Exception)
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps(
+                        {'status': 'fail'}
+                    ), )
+        connection.commit()
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {'status': 'success'}
+            ), )
+    except Exception:
+        print(Exception)
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {'status': 'fail'}
+            ), )
+
+
+async def pubDynamic(request):  # 发布动态
+    params = await request.json()
+    with connection.cursor() as cursor:
+
+        try:
+            user = decodeJwt(request.headers["auth"])
+            sql = 'insert into dynamic ' \
+                  '(PUBLISH_TIME,DY_CONTENT,RECORD_ID,USERID) ' \
+                  'values (%d,"%s",%d,%d)' % (
+                      round(time.time()), params['content'],
+                      params['recordId'], user['userid']
+                  )
+            cursor.execute(sql)
+            connection.commit()
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'success'}
+                ), )
+
+        except Exception:
+            print(Exception)
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'fail'}
+                ), )
+
+
+async def donation(request):  # 支持本站
+    params = await request.json()
+    with connection.cursor() as cursor:
+        try:
+            user = decodeJwt(request.headers["auth"])
+            sql = 'insert into donate_tbl (COUNT, USERID) VALUES (%d,%d)' \
+                  % (params['count'], user['userid'])
+            cursor.execute(sql)
+            connection.commit()
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'success'}
+                ), )
+        except Exception:
+            print(Exception)
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'fail'}
+                ), )
+
+
+async def pubComment(request):  # 发布评论
+    params = await request.json()
+    with connection.cursor() as cursor:
+        try:
+            user = decodeJwt(request.headers["auth"])
+            sql = 'insert into comment ' \
+                  '(PUBLISH_TIME,COMMENT_CONTENT,FORWARD_ID,USERID) ' \
+                  'values (%d,"%s",%d,%d)' % (
+                      round(time.time()), params['content'],
+                      params['dynamicID'], user['userid']
+                  )
+            cursor.execute(sql)
+            connection.commit()
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'success'}
+                ), )
+        except Exception:
+            print(Exception)
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'fail'}
+                ), )
+
+
+async def likeComment(request):  # 点赞评论
+    params = await request.json()
+    with connection.cursor() as cursor:
+
+        try:
+            user = decodeJwt(request.headers["auth"])
+            sql = 'select * from comment_like_tbl where COMMENT_ID=%d and USERID=%d'\
+                  % (params['commentID'], user['userid'])
+            cursor.execute(sql)
+            result = cursor.fetchone()
+            if result is None:
+                user = decodeJwt(request.headers["auth"])
+                sql = 'insert into comment_like_tbl (COMMENT_ID, USERID) VALUES (%d,%d)' \
+                      % (params['commentID'], user['userid'])
+                cursor.execute(sql)
+                connection.commit()
+                sql = 'update comment set LIKE_COUNT = LIKE_COUNT+1 where COMMENT_ID=%d' \
+                      % (params['commentID'])
+                cursor.execute(sql)
+                connection.commit()
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps(
+                        {'status': 'success'}
+                    ), )
+            else:
+                raise Exception()
+
+        except Exception:
+            print(Exception)
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'fail'}
+                ), )
+
+
+async def likeDynamic(request):  # 点赞动态
+    params = await request.json()
+    with connection.cursor() as cursor:
+
+        try:
+            user = decodeJwt(request.headers["auth"])
+            sql = 'select * from like_tbl where DYNAMIC_ID=%d and USERID=%d'\
+                  % (params['dynamicID'], user['userid'])
+            cursor.execute(sql)
+            result = cursor.fetchone()
+            if result is None:
+                user = decodeJwt(request.headers["auth"])
+                sql = 'insert into like_tbl (DYNAMIC_ID, USERID) VALUES (%d,%d)' \
+                      % (params['dynamicID'], user['userid'])
+                cursor.execute(sql)
+                connection.commit()
+                sql = 'update dynamic set LIKE_COUNT = LIKE_COUNT+1 where DYNAMIC_ID=%d' \
+                      % (params['dynamicID'])
+                cursor.execute(sql)
+                connection.commit()
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps(
+                        {'status': 'success'}
+                    ), )
+            else:
+                raise Exception("temp")
+
+        except Exception:
+            print(Exception)
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps(
+                    {'status': 'fail'}
+                ), )
+
+
+async def dynamicList(request):  # 动态列表
+    try:
+        user = decodeJwt(request.headers['auth'])
+        with connection.cursor() as cursor:
+            try:
+                sql = 'SELECT DYNAMIC_ID,NAME,PUBLISH_TIME,DY_CONTENT,LIKE_COUNT,PIC_PATH FROM dynamic dy ' \
+                      'inner join user u on dy.USERID = u.USERID ' \
+                      'inner join use_record ur on dy.RECORD_ID = ur.RECORD_ID ' \
+                      'limit 10 offset %d' % (int(request.query['page'])*10)
+                cursor.execute(sql)
+                result = cursor.fetchall()
+                sql = 'SELECT count(*) FROM dynamic'
+                cursor.execute(sql)
+                count = cursor.fetchone()['count(*)']
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps({"status": "success", "data": result, "count": count}))
+            except Exception:
+                print(Exception)
+                return web.Response(
+                    content_type="application/json",
+                    text=json.dumps(
+                        {'status': 'fail'}
+                    ), )
+    except Exception:
+        print(Exception)
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(
+                {'status': 'fail'}
+            ), )
+
+
+async def dynamicDetail(request):  # 动态详情
+    params = await request.json()
+    try:
+        user = decodeJwt(request.headers['auth'])
+        with connection.cursor() as cursor:
             try:
                 sql = 'SELECT COMMENT_ID,NAME,PUBLISH_TIME,COMMENT_CONTENT,LIKE_COUNT FROM comment com ' \
                       'inner join user u on com.USERID = u.USERID where FORWARD_ID = %d' \
                       ' limit 10 offset %d'\
-                      %( params['dynamicID'],params['page']*10)
+                      % (params['dynamicID'], params['page']*10)
                 cursor.execute(sql)
                 result = cursor.fetchall()
                 sql = 'SELECT count(*) from comment where FORWARD_ID=%d' \
@@ -548,7 +612,8 @@ async def dynamicDetail(request):
                 count = cursor.fetchone()['count(*)']
                 return web.Response(
                     content_type="application/json",
-                    text=json.dumps({"status": "success", "data": result,'count':count})
+                    text=json.dumps(
+                        {"status": "success", "data": result, 'count': count})
                 )
             except Exception:
                 print(Exception)
@@ -566,21 +631,7 @@ async def dynamicDetail(request):
             ), )
 
 
-async def index(request):
-    content = open(os.path.join(ROOT, "index.html"), "r").read()
-    return web.Response(content_type="text/html", text=content)
-
-
-async def javascript(request):
-    content = open(os.path.join(ROOT, "client.js"), "r").read()
-    return web.Response(content_type="application/javascript", text=content)
-
-
-async def test(request):
-    return web.Response(content_type="application/javascript", text=json.dumps({''}))
-
-
-async def offer(request):
+async def offer(request):  # WebRTC握手请求及对接收视频的处理
     params = await request.json()
     try:
         user = decodeJwt(params['token'])
@@ -612,7 +663,7 @@ async def offer(request):
     def on_datachannel(channel):
         @channel.on("message")
         def on_message(message):
-            nonlocal predict
+            nonlocal predict  # 利用datachannel将识别结果传至前端
             if predict is not None:
                 channel.send(json.dumps({'data': predict.tolist()}))
 
@@ -641,7 +692,7 @@ async def offer(request):
                     super().__init__()  # don't forget this!
                     self.track = track
 
-                async def recv(self):
+                async def recv(self):  # 提取帧，进行识别并标注人脸位置
                     frame = await self.track.recv()
                     frame_array = frame.to_ndarray(format="bgr24")
                     frame_array = imutils.resize(frame_array, width=300)
@@ -676,10 +727,9 @@ async def offer(request):
                 recorder.addTrack(relay.subscribe(track))
 
         @track.on("ended")
-        async def on_ended():
+        async def on_ended():  # RTC链接结束时将最后一次识别的结果与时间存入数据库
             log_info("Track %s ended", track.kind)
             with connection.cursor() as cursor:
-                # Create a new record
                 nonlocal user, predict
                 temp = []
                 for i in predict.tolist():
@@ -687,8 +737,6 @@ async def offer(request):
                 sql = 'insert into use_record (USERID, USE_TIME, PIC_PATH) values (%d,%d,"%s")' % (
                     user['userid'], round(time.time()), str(temp).replace(', ', '.'))
                 cursor.execute(sql)
-                # connection is not autocommit by default. So you must commit to save
-                # your changes.
             connection.commit()
             await recorder.stop()
 
@@ -744,6 +792,7 @@ if __name__ == "__main__":
 
     app = web.Application()
     app.on_shutdown.append(on_shutdown)
+    # 路由表
     app.router.add_post("/login", login)
     app.router.add_post("/register", register)
     app.router.add_post("/offer", offer)
@@ -755,13 +804,14 @@ if __name__ == "__main__":
     app.router.add_post("/pubDynamic", pubDynamic)
     app.router.add_post("/pubComment", pubComment)
     app.router.add_post("/dynamicDetail", dynamicDetail)
+    app.router.add_post("/deleteDynamic", deleteDynamic)
     app.router.add_post("/likeComment", likeComment)
     app.router.add_post("/likeDynamic", likeDynamic)
     app.router.add_post("/superProfile", superProfile)
     app.router.add_post("/donation", donation)
+    app.router.add_post("/cancelAccount", cancelAccount)
     app.router.add_get("/dynamicList", dynamicList)
-
-    cors = aiohttp_cors.setup(app, defaults={
+    cors = aiohttp_cors.setup(app, defaults={  # 配置CORS
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=True,
             expose_headers="*",

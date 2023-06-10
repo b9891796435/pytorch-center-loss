@@ -1,3 +1,4 @@
+CREATE DATABASE PROJECT;
 USE PROJECT;
 
 DROP TABLE IF EXISTS USER;
@@ -85,3 +86,4 @@ CREATE TABLE DONATE_TBL (
         PRIMARY KEY ( DONATE_ID )
 );
 
+insert into user (name,age,sex,uname,password,aut_num) values ("Eileen",19,"F","EileenQueen","SweetCounter",2);

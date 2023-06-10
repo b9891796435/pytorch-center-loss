@@ -16,7 +16,8 @@ emotion_model_path = 'model.pth'
 # hyperparameters for bounding boxes shape
 # loading models
 face_detection = cv2.CascadeClassifier(detection_model_path)
-emotion_dict = torch.load(emotion_model_path, map_location=torch.device('cpu')).eval().state_dict()
+emotion_dict = torch.load(
+    emotion_model_path, map_location=torch.device('cpu')).eval().state_dict()
 emotion_classifier = emotion_dict.items()
 temp_arr = []
 for i in emotion_classifier:
@@ -38,20 +39,20 @@ EMOTIONS = ["neutral", "happiness", "surprise", "sadness", "anger", "disgust",
 
 # starting video streaming
 
+
 def frame_parse(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_detection.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30),
-                                            flags=cv2.CASCADE_SCALE_IMAGE)
+                                            flags=cv2.CASCADE_SCALE_IMAGE)#提取人脸
     if len(faces) > 0:
         faces = sorted(faces, reverse=True,
                        key=lambda x: (x[2] - x[0]) * (x[3] - x[1]))[0]
         (fX, fY, fW, fH) = faces
-        # Extract the ROI of the face from the grayscale image, resize it to a fixed 28x28 pixels, and then prepare
-        # the ROI for classification via the CNN
         res = []
         roi = gray[fY:fY + fH, fX:fX + fW]
         roi = cv2.resize(roi, (64, 64))
-        roi = cv2.resize(roi.astype('uint8'), (224, 224), interpolation=cv2.INTER_CUBIC)
+        roi = cv2.resize(roi.astype('uint8'), (224, 224),
+                         interpolation=cv2.INTER_CUBIC)
         res.append(roi)
         res = np.array(res)
         res = np.expand_dims(res, -1)
@@ -70,16 +71,18 @@ def frame_parse(frame):
         return preds, faces
     else:
         return None
+
+
 if __name__ == '__main__':
     cv2.namedWindow('your_face')
-    camera = cv2.VideoCapture(2)
+    camera = cv2.VideoCapture(0)
     while True:
         frame = camera.read()[1]
         frame = imutils.resize(frame, width=300)
         frameClone = frame.copy()
         canvas = np.zeros((250, 300, 3), dtype="uint8")
         # reading the frame
-        result=frame_parse(frame)
+        result = frame_parse(frame)
         if result is not None:
             (preds, faces) = result
             (fX, fY, fW, fH) = faces
@@ -108,6 +111,7 @@ if __name__ == '__main__':
         #    for c in range(0, 3):
         #        frame[200:320, 10:130, c] = emoji_face[:, :, c] * \
         #        (emoji_face[:, :, 3] / 255.0) + frame[200:320,
+
         #        10:130, c] * (1.0 - emoji_face[:, :, 3] / 255.0)
 
         cv2.imshow('your_face', frameClone)

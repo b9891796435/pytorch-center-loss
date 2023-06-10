@@ -16,7 +16,7 @@ from PIL import Image
 dataset_path = 'fer2013/fer2013/fer2013.csv'
 image_size = (48, 48)
 max_sample = 500
-folder_path = r'd:/Documents/GitHub/FERPlus/data/'
+folder_path = './data/FERPlus/'
 training_path = 'FER2013Train'
 test_path = 'FER2013Test'
 file_extension = 'png'
